@@ -7,8 +7,8 @@ from block import Block
 from entity import Entity
 
 #constants
-WIDTH = 800
-HEIGHT = 600
+WIDTH = 1600
+HEIGHT = 900
 
 SCALE = 4 #scale of textures
 
@@ -139,14 +139,17 @@ while alive:
 			entity.velocityY = 0
 			entity.y = math.floor(entity.y)
 
+	camX = entities[0].x-WIDTH//(16*SCALE)/2
+	camY = entities[0].y+HEIGHT//(16*SCALE)/2-1
+
 	pygame.display.set_caption("FPS: "+str(clock.get_fps()))
 		
 	#drawing
 	screen.fill((63, 127, 191))
 
 	#blocks
-	for y in range(camY-HEIGHT//(16*SCALE), camY+1):
-		for x in range(camX, 1+camX+WIDTH//(16*SCALE)):
+	for y in range(int(camY)-HEIGHT//(16*SCALE), int(camY)+1):
+		for x in range(int(camX), 2+int(camX)+WIDTH//(16*SCALE)):
 			if x>=0 and x<WORLD_WIDTH and y>=0 and y<WORLD_HEIGHT and gameMap[y][x].name != "air":
 				screen.blit(textures["blocks"][gameMap[y][x].name], ((x-camX)*16*SCALE, (camY-y)*16*SCALE))
 
