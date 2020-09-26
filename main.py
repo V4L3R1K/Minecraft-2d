@@ -1,18 +1,21 @@
 import pygame
 import os
 import math
+import random
 
 from block import Block
 from entity import Entity
 
 #constants
 WIDTH = 800
-HEIGHT = 450
+HEIGHT = 600
 
 SCALE = 4 #scale of textures
 
 WORLD_WIDTH = 256
 WORLD_HEIGHT = 256
+
+G = 25 #gravity
 
 #initializing pygame
 pygame.init()
@@ -47,21 +50,20 @@ for x in range(WORLD_WIDTH):
 	for y in range(0, 60):
 		gameMap[y][x] = Block("stone")
 
-gameMap[64][3] = Block("stone")
-gameMap[65][5] = Block("stone")
-
 #steve
 entities = []
 entities.append(Entity(0, 65, "steveRight"))
 
 #camera
 camX = 0
-camY = 69
+camY = 70
 
 #keys pressed
 k_space = False
 k_a = False
 k_d = False
+
+lastX, lastY = 0, 0
 
 #main cycle
 alive = True
@@ -73,7 +75,10 @@ while alive:
 		elif event.type == pygame.KEYDOWN:
 			if event.key == pygame.K_SPACE:
 				if entities[0].velocityY == 0:
-					entities[0].velocityY = 5
+					entities[0].velocityY = 7.5
+					entities[0].accelerationY = -G
+					entities[0].velocityY+=entity.accelerationY*clock.get_time()/1000
+					entities[0].y+=entity.velocityY*clock.get_time()/1000
 
 			elif event.key == pygame.K_a:
 				k_a = True
@@ -98,34 +103,41 @@ while alive:
 		entities[0].name = "steveRight"
 		entities[0].velocityX += 3
 
-	#kinematics
+	#physics
 	for entity in entities:
 		#X
 		if entity.name.endswith("Right"):
-			if gameMap[math.floor(entity.y)][math.floor(entity.x+8/16)].name != "air" or gameMap[math.floor(entity.y-1)][math.floor(entity.x+8/16)].name != "air":
+			if gameMap[math.ceil(entity.y)][math.floor(entity.x+8/16)].name != "air" or gameMap[math.ceil(entity.y-1)][math.floor(entity.x+8/16)].name != "air" or gameMap[math.floor(entity.y-1)][math.floor(entity.x+8/16)].name != "air":
 				entity.accelerationX = 0
 				entity.velocityX = 0
-		
-		elif entity.name.endswith("Left"):
-			if gameMap[math.floor(entity.y)][math.floor(entity.x)].name != "air" or gameMap[math.floor(entity.y-1)][math.floor(entity.x)].name != "air":
-				entity.accelerationX = 0
-				entity.velocityX = 0
+			else:
+				entity.velocityX+=entity.accelerationX*clock.get_time()/1000
+				entity.x+=entity.velocityX*clock.get_time()/1000
 
-		entity.velocityX+=entity.accelerationX*clock.get_time()/1000
-		entity.velocityY+=entity.accelerationY*clock.get_time()/1000
-		entity.x+=entity.velocityX*clock.get_time()/1000
-		entity.y+=entity.velocityY*clock.get_time()/1000
+		elif entity.name.endswith("Left"):
+			if gameMap[math.ceil(entity.y)][math.floor(entity.x)].name != "air" or gameMap[math.ceil(entity.y-1)][math.floor(entity.x)].name != "air" or gameMap[math.floor(entity.y-1)][math.floor(entity.x)].name != "air":
+				entity.accelerationX = 0
+				entity.velocityX = 0
+			else:
+				entity.velocityX+=entity.accelerationX*clock.get_time()/1000
+				entity.x+=entity.velocityX*clock.get_time()/1000		
 
 		if entity.x < 0: entity.x = 0
 		if entity.x > WORLD_WIDTH-textures["entities"][entity.name].get_width()/(SCALE*16)-1/16: entity.x = WORLD_WIDTH-textures["entities"][entity.name].get_width()/(SCALE*16)-1/16
 		
 		#Y
-		if gameMap[math.ceil(entity.y-2)][math.floor(entity.x)].name != "air" or gameMap[math.ceil(entity.y-2)][math.ceil(entity.x-8/16)].name != "air":
+		if gameMap[math.ceil(entity.y-2)][math.floor(entity.x+1/16)].name != "air" or gameMap[math.ceil(entity.y-2)][math.floor(entity.x+7/16)].name != "air":
 			entity.accelerationY = 0
 			entity.velocityY = 0
 			entity.y = math.ceil(entity.y)
 		else:
-			entity.accelerationY = -10
+			entity.accelerationY = -G
+			entity.velocityY+=entity.accelerationY*clock.get_time()/1000
+			entity.y+=entity.velocityY*clock.get_time()/1000
+
+		if gameMap[math.ceil(entity.y)][math.floor(entity.x+1/16)].name != "air" or gameMap[math.ceil(entity.y)][math.floor(entity.x+7/16)].name != "air":
+			entity.velocityY = 0
+			entity.y = math.floor(entity.y)
 
 	pygame.display.set_caption("FPS: "+str(clock.get_fps()))
 		
@@ -143,6 +155,6 @@ while alive:
 		if (entity.x-camX)*16*SCALE > -16*SCALE*textures["entities"][entity.name].get_width() and (entity.x-camX)*16*SCALE < WIDTH and (camY-entity.y)*16*SCALE > -16*SCALE*textures["entities"][entity.name].get_height() and (camY-entity.y)*16*SCALE < HEIGHT:
 			screen.blit(textures["entities"][entity.name], ((entity.x-camX)*16*SCALE, (camY-entity.y)*16*SCALE))
 
-	pygame.display.update()
+	pygame.display.flip()
 
 	clock.tick()
