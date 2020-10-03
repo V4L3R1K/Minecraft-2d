@@ -10,10 +10,21 @@ from entity import Entity
 WIDTH = 1600
 HEIGHT = 900
 
-SCALE = 4 #scale of textures
+SCALE = 3 #scale of textures
 
+#world generation settings
 WORLD_WIDTH = 256
 WORLD_HEIGHT = 256
+
+random.seed(0) #world seed
+
+HEIGHT_DEFAULT = 63
+HEIGHT_DISPERSION = 2
+
+GENERATION_STEP = 4
+
+TREE_STEP_MIN = 4
+TREE_STEP_MAX = 8
 
 G = 20 #gravity
 
@@ -40,19 +51,56 @@ for y in range(WORLD_HEIGHT):
 	for x in range(WORLD_WIDTH):
 		gameMap[y].append(Block("air"))
 
-for x in range(WORLD_WIDTH):
-	gameMap[63][x] = Block("grass")
-for x in range(WORLD_WIDTH):
-	gameMap[62][x] = Block("dirt")
-	gameMap[61][x] = Block("dirt")
-	gameMap[60][x] = Block("dirt")
-for x in range(WORLD_WIDTH):
-	for y in range(0, 60):
-		gameMap[y][x] = Block("stone")
+lastEnd = HEIGHT_DEFAULT
+for i in range(WORLD_WIDTH//GENERATION_STEP):
+	thisEnd = random.randint(HEIGHT_DEFAULT-HEIGHT_DISPERSION, HEIGHT_DEFAULT+HEIGHT_DISPERSION)
+	gameMap[lastEnd][i*GENERATION_STEP] = Block("grass")
+	for x in range(1, GENERATION_STEP):
+		gameMap[int(lastEnd-(lastEnd-thisEnd)/GENERATION_STEP*x)][i*GENERATION_STEP+x] = Block("grass")
+	lastEnd = thisEnd
+
+for y in range(WORLD_HEIGHT):
+	for blockX in range(len(gameMap[y])):
+		if gameMap[y][blockX].name == "grass":
+			gameMap[y-1][blockX] = Block("dirt")
+			gameMap[y-2][blockX] = Block("dirt")
+			if random.randint(0,1) == 1:
+				gameMap[y-3][blockX] = Block("dirt")
+			else:
+				gameMap[y-3][blockX] = Block("stone")
+			for yStone in range(0, y-3):
+				gameMap[yStone][blockX] = Block("stone")
+
+#trees
+yTrees = [random.randint(TREE_STEP_MIN, TREE_STEP_MAX)]
+while yTrees[-1] < WORLD_WIDTH:
+	yTrees.append(yTrees[-1]+random.randint(TREE_STEP_MIN, TREE_STEP_MAX))
+yTrees.pop(-1)
+for y in range(WORLD_HEIGHT):
+	for blockX in yTrees:
+		if gameMap[y][blockX].name == "grass":
+			gameMap[y+1][blockX] = Block("oak_log")
+			gameMap[y+2][blockX] = Block("oak_log")
+			gameMap[y+3][blockX] = Block("oak_log")
+			gameMap[y+4][blockX] = Block("oak_log")
+			gameMap[y+5][blockX] = Block("oak_log")
+			gameMap[y+3][blockX-2] = Block("oak_leaves")
+			gameMap[y+3][blockX-1] = Block("oak_leaves")
+			gameMap[y+3][blockX+2] = Block("oak_leaves")
+			gameMap[y+3][blockX+1] = Block("oak_leaves")
+			gameMap[y+4][blockX-2] = Block("oak_leaves")
+			gameMap[y+4][blockX-1] = Block("oak_leaves")
+			gameMap[y+4][blockX+2] = Block("oak_leaves")
+			gameMap[y+4][blockX+1] = Block("oak_leaves")
+			gameMap[y+5][blockX-1] = Block("oak_leaves")
+			gameMap[y+5][blockX+1] = Block("oak_leaves")
+			gameMap[y+6][blockX-1] = Block("oak_leaves")
+			gameMap[y+6][blockX] = Block("oak_leaves")
+			gameMap[y+6][blockX+1] = Block("oak_leaves")
 
 #steve
 entities = []
-entities.append(Entity(random.randint(0, WORLD_WIDTH), 65, "steveRight"))
+entities.append(Entity(0.5, 70, "steveRight"))
 
 #camera
 camX = 0
@@ -109,7 +157,11 @@ while alive:
 				try:
 					#you cant place blocks inside youself
 					if (curY != math.ceil(entities[0].y) or curX != math.floor(entities[0].x+8/16)) and (int(curY) != math.ceil(entities[0].y-1) or int(curX) != math.floor(entities[0].x+8/16)) and (int(curY) != math.floor(entities[0].y-1) or int(curX) != math.floor(entities[0].x+8/16)) and (curY != math.ceil(entities[0].y) or curX != math.floor(entities[0].x)) and (int(curY) != math.ceil(entities[0].y-1) or int(curX) != math.floor(entities[0].x)) and (int(curY) != math.floor(entities[0].y-1) or int(curX) != math.floor(entities[0].x)):
-						gameMap[int(curY)][int(curX)] = Block("stone")
+						#you cant place blocks outside the world
+						if curY>=0 and curY<WORLD_HEIGHT and curX>=0 and curX<WORLD_WIDTH:
+							#you can place blocks only in the air
+							if gameMap[int(curY)][int(curX)].name == "air":
+								gameMap[int(curY)][int(curX)] = Block("stone")
 				except:
 					print(1)
 
@@ -179,7 +231,7 @@ while alive:
 
 	#blocks
 	for y in range(int(camY)-HEIGHT//(16*SCALE), int(camY)+1):
-		for x in range(int(camX), 1+int(camX)+WIDTH//(16*SCALE)):
+		for x in range(int(camX), 2+int(camX)+WIDTH//(16*SCALE)):
 			if x>=0 and x<WORLD_WIDTH and y>=0 and y<WORLD_HEIGHT and gameMap[y][x].name != "air":
 				screen.blit(textures["blocks"][gameMap[y][x].name], ((x-camX)*16*SCALE, (camY-y)*16*SCALE))
 
@@ -194,3 +246,5 @@ while alive:
 	pygame.display.flip()
 
 	clock.tick(60)
+
+	print(entities[0].y)
