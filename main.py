@@ -7,10 +7,10 @@ from block import Block
 from entity import Entity
 
 #constants
-WIDTH = 1600
-HEIGHT = 900
+WIDTH = 1200
+HEIGHT = 675
 
-SCALE = 3 #scale of textures
+SCALE = 4 #scale of textures
 
 #world generation settings
 WORLD_WIDTH = 256
@@ -19,12 +19,12 @@ WORLD_HEIGHT = 256
 random.seed(0) #world seed
 
 HEIGHT_DEFAULT = 63
-HEIGHT_DISPERSION = 2
+HEIGHT_DISPERSION = 4
 
-GENERATION_STEP = 4
+GENERATION_STEP = 8
 
-TREE_STEP_MIN = 4
-TREE_STEP_MAX = 8
+TREE_STEP_MIN = 8
+TREE_STEP_MAX = 16
 
 G = 20 #gravity
 
@@ -79,24 +79,27 @@ yTrees.pop(-1)
 for y in range(WORLD_HEIGHT):
 	for blockX in yTrees:
 		if gameMap[y][blockX].name == "grass":
-			gameMap[y+1][blockX] = Block("oak_log")
-			gameMap[y+2][blockX] = Block("oak_log")
-			gameMap[y+3][blockX] = Block("oak_log")
-			gameMap[y+4][blockX] = Block("oak_log")
-			gameMap[y+5][blockX] = Block("oak_log")
-			gameMap[y+3][blockX-2] = Block("oak_leaves")
-			gameMap[y+3][blockX-1] = Block("oak_leaves")
-			gameMap[y+3][blockX+2] = Block("oak_leaves")
-			gameMap[y+3][blockX+1] = Block("oak_leaves")
-			gameMap[y+4][blockX-2] = Block("oak_leaves")
-			gameMap[y+4][blockX-1] = Block("oak_leaves")
-			gameMap[y+4][blockX+2] = Block("oak_leaves")
-			gameMap[y+4][blockX+1] = Block("oak_leaves")
-			gameMap[y+5][blockX-1] = Block("oak_leaves")
-			gameMap[y+5][blockX+1] = Block("oak_leaves")
-			gameMap[y+6][blockX-1] = Block("oak_leaves")
-			gameMap[y+6][blockX] = Block("oak_leaves")
-			gameMap[y+6][blockX+1] = Block("oak_leaves")
+			try:
+				gameMap[y+1][blockX] = Block("oak_log")
+				gameMap[y+2][blockX] = Block("oak_log")
+				gameMap[y+3][blockX] = Block("oak_log")
+				gameMap[y+4][blockX] = Block("oak_log")
+				gameMap[y+5][blockX] = Block("oak_log")
+				gameMap[y+3][blockX-2] = Block("oak_leaves")
+				gameMap[y+3][blockX-1] = Block("oak_leaves")
+				gameMap[y+3][blockX+2] = Block("oak_leaves")
+				gameMap[y+3][blockX+1] = Block("oak_leaves")
+				gameMap[y+4][blockX-2] = Block("oak_leaves")
+				gameMap[y+4][blockX-1] = Block("oak_leaves")
+				gameMap[y+4][blockX+2] = Block("oak_leaves")
+				gameMap[y+4][blockX+1] = Block("oak_leaves")
+				gameMap[y+5][blockX-1] = Block("oak_leaves")
+				gameMap[y+5][blockX+1] = Block("oak_leaves")
+				gameMap[y+6][blockX-1] = Block("oak_leaves")
+				gameMap[y+6][blockX] = Block("oak_leaves")
+				gameMap[y+6][blockX+1] = Block("oak_leaves")
+			except:
+				pass
 
 #steve
 entities = []
@@ -113,6 +116,8 @@ k_d = False
 curX, curY = 0, 0 #cursor
 
 mouseX, mouseY = 0, 0 #mouse
+
+showDebug = False #F3 menu
 
 #main cycle
 alive = True
@@ -135,6 +140,9 @@ while alive:
 
 			elif event.key == pygame.K_d:
 				k_d = True
+
+			elif event.key == pygame.K_F3:
+				showDebug = not showDebug
 
 		elif event.type == pygame.KEYUP:
 			if event.key == pygame.K_a:
@@ -163,7 +171,7 @@ while alive:
 							if gameMap[int(curY)][int(curX)].name == "air":
 								gameMap[int(curY)][int(curX)] = Block("stone")
 				except:
-					print(1)
+					pass
 
 	entities[0].velocityX = 0
 
@@ -175,50 +183,30 @@ while alive:
 		entities[0].name = "steveRight"
 		entities[0].velocityX += 4
 
-	#physics
+	#collision detection
 	for entity in entities:
-		#X
-		try:
-			if entity.name.endswith("Right"):
-				if gameMap[math.ceil(entity.y)][math.floor(entity.x+8/16)].name != "air" or gameMap[math.ceil(entity.y-1)][math.floor(entity.x+8/16)].name != "air" or gameMap[math.floor(entity.y-1)][math.floor(entity.x+8/16)].name != "air":
-					entity.accelerationX = 0
-					entity.velocityX = 0
-				else:
-					entity.velocityX+=entity.accelerationX*clock.get_time()/1000
-					entity.x+=entity.velocityX*clock.get_time()/1000
+		entity.accelerationY = -G
+		entity.velocityY += entity.accelerationY*clock.get_time()/1000
+		entity.y += entity.velocityY*clock.get_time()/1000
 
-			elif entity.name.endswith("Left"):
-				if gameMap[math.ceil(entity.y)][math.floor(entity.x)].name != "air" or gameMap[math.ceil(entity.y-1)][math.floor(entity.x)].name != "air" or gameMap[math.floor(entity.y-1)][math.floor(entity.x)].name != "air":
-					entity.accelerationX = 0
-					entity.velocityX = 0
-				else:
-					entity.velocityX+=entity.accelerationX*clock.get_time()/1000
-					entity.x+=entity.velocityX*clock.get_time()/1000
-		except:
-			entity.velocityX+=entity.accelerationX*clock.get_time()/1000
-			entity.x+=entity.velocityX*clock.get_time()/1000
+		if gameMap[math.floor(entity.y)-1][math.floor(entity.x)].name != "air" or gameMap[math.floor(entity.y)-1][math.ceil(entity.x-8/16)].name != "air": #bottom
+			entity.velocityY = 0
+			entity.y = math.ceil(entity.y)
+
+		if gameMap[math.ceil(entity.y)][math.floor(entity.x)].name != "air" or gameMap[math.ceil(entity.y)][math.ceil(entity.x-8/16)].name != "air": #top
+			entity.velocityY = 0
+			entity.y = math.floor(entity.y)
+		
+		entity.velocityX += entity.accelerationX*clock.get_time()/1000
+		entity.x += entity.velocityX*clock.get_time()/1000
+
+		if gameMap[math.ceil(entity.y)][math.ceil(entity.x-8/16)].name != "air" or gameMap[math.floor(entity.y)][math.ceil(entity.x-8/16)].name != "air" or gameMap[math.floor(entity.y)-1][math.ceil(entity.x-8/16)].name != "air": #right
+			entity.x = math.floor(entity.x)+8/16
+		if gameMap[math.ceil(entity.y)][math.floor(entity.x)].name != "air" or gameMap[math.floor(entity.y)][math.floor(entity.x)].name != "air" or gameMap[math.floor(entity.y)-1][math.floor(entity.x)].name != "air": #right
+			entity.x = math.ceil(entity.x)
 
 		if entity.x < 0: entity.x = 0
-		if entity.x > WORLD_WIDTH-textures["entities"][entity.name].get_width()/(SCALE*16)-1/16: entity.x = WORLD_WIDTH-textures["entities"][entity.name].get_width()/(SCALE*16)-1/16
-		
-		#Y
-		try:
-			if gameMap[math.ceil(entity.y-2)][math.floor(entity.x+1/16)].name != "air" or gameMap[math.ceil(entity.y-2)][math.floor(entity.x+7/16)].name != "air":
-				entity.accelerationY = 0
-				entity.velocityY = 0
-				entity.y = math.ceil(entity.y)
-			else:
-				entity.accelerationY = -G
-				entity.velocityY+=entity.accelerationY*clock.get_time()/1000
-				entity.y+=entity.velocityY*clock.get_time()/1000
-
-			if gameMap[math.ceil(entity.y)][math.floor(entity.x+1/16)].name != "air" or gameMap[math.ceil(entity.y)][math.floor(entity.x+7/16)].name != "air":
-				entity.velocityY = 0
-				entity.y = math.floor(entity.y)
-		except:
-			entity.accelerationY = -G
-			entity.velocityY+=entity.accelerationY*clock.get_time()/1000
-			entity.y+=entity.velocityY*clock.get_time()/1000
+		if entity.x > WORLD_WIDTH-textures["entities"][entity.name].get_width()/(SCALE*16): entity.x = WORLD_WIDTH-textures["entities"][entity.name].get_width()/(SCALE*16)
 
 	camX = entities[0].x-WIDTH//(16*SCALE)/2
 	camY = entities[0].y+HEIGHT//(16*SCALE)/2
@@ -230,7 +218,7 @@ while alive:
 	screen.fill((63, 127, 191))
 
 	#blocks
-	for y in range(int(camY)-HEIGHT//(16*SCALE), int(camY)+1):
+	for y in range(int(camY)-HEIGHT//(16*SCALE), int(camY)+2):
 		for x in range(int(camX), 2+int(camX)+WIDTH//(16*SCALE)):
 			if x>=0 and x<WORLD_WIDTH and y>=0 and y<WORLD_HEIGHT and gameMap[y][x].name != "air":
 				screen.blit(textures["blocks"][gameMap[y][x].name], ((x-camX)*16*SCALE, (camY-y)*16*SCALE))
@@ -243,8 +231,21 @@ while alive:
 	#cursor
 	pygame.draw.rect(screen, (191, 191, 191), ((curX-camX)*(16*SCALE), (camY-curY)*(16*SCALE), 16*SCALE, 16*SCALE), 1)
 
+	#debug (F3 menu)
+	if showDebug:
+		screen.blit(pygame.font.SysFont("consolas", 11).render("FPS: "+str(clock.get_fps()), 1, (255, 255, 255)), (0, 0))
+		screen.blit(pygame.font.SysFont("consolas", 11).render("XY: "+str(round(entities[0].x, 5))+" / "+str(round(entities[0].y, 5)), 1, (255, 255, 255)), (0, 10))
+		screen.blit(pygame.font.SysFont("consolas", 11).render("Cam XY: "+str(round(camX, 5))+" / "+str(round(camY, 5)), 1, (255, 255, 255)), (0, 20))
+
+	'''
+	pygame.draw.rect(screen, (255, 0, 0), ((math.floor(entities[0].x)-camX)*(16*SCALE), (camY-math.ceil(entities[0].y))*(16*SCALE), 16*SCALE, 16*SCALE), 1)
+	pygame.draw.rect(screen, (127, 0, 0), ((math.floor(entities[0].x)-camX)*(16*SCALE), (camY-math.floor(entities[0].y))*(16*SCALE), 16*SCALE, 16*SCALE), 1)
+	pygame.draw.rect(screen, (63, 0, 0), ((math.floor(entities[0].x)-camX)*(16*SCALE), (camY-math.floor(entities[0].y)+1)*(16*SCALE), 16*SCALE, 16*SCALE), 1)
+	pygame.draw.rect(screen, (0, 255, 0), ((math.ceil(entities[0].x-8/16)-camX)*(16*SCALE), (camY-math.ceil(entities[0].y))*(16*SCALE), 16*SCALE, 16*SCALE), 1)
+	pygame.draw.rect(screen, (0, 127, 0), ((math.ceil(entities[0].x-8/16)-camX)*(16*SCALE), (camY-math.floor(entities[0].y))*(16*SCALE), 16*SCALE, 16*SCALE), 1)
+	pygame.draw.rect(screen, (0, 63, 0), ((math.ceil(entities[0].x-8/16)-camX)*(16*SCALE), (camY-math.floor(entities[0].y)+1)*(16*SCALE), 16*SCALE, 16*SCALE), 1)
+	'''
+
 	pygame.display.flip()
 
-	clock.tick(60)
-
-	print(entities[0].y)
+	clock.tick()
