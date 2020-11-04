@@ -1,0 +1,7 @@
+{
+	"hardness": 2,
+	"tool": "axe",
+	"material": "hand",
+	"drop":[
+		{"name": "oak_log", "amount": 1, "chance": 1}]
+}

@@ -1,0 +1,7 @@
+{
+	"hardness": 0.5,
+	"tool": "shovel",
+	"material": "hand",
+	"drop":[
+		{"name": "dirt", "amount": 1, "chance": 1}]
+}

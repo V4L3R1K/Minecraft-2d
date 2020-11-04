@@ -2,15 +2,93 @@ import pygame
 import os
 import math
 import random
+import json
+import time
 
 from block import Block
 from entity import Entity
+from item import Item
+
+def CalculateBreakTime(block, item):
+	blockProperties = properties["blocks"][block]
+
+	t = 1.5 * blockProperties["hardness"]
+	
+	if blockProperties["material"] == "hand":
+		if item.endswith(blockProperties["tool"]):
+			if item.startswith("wooden"):
+				t /= 2
+			elif item.startswith("stone"):
+				t /= 4
+			elif item.startswith("iron"):
+				t /= 6
+			elif item.startswith("diamond"):
+				t /= 8
+			elif item.startswith("golden"):
+				t /= 12
+			else:
+				print("error: "+item+" does not exist")
+		else:
+			pass
+	elif blockProperties["material"] == "wooden":
+		if item.endswith(blockProperties["tool"]):
+			if item.startswith("wooden"):
+				t /= 2
+			elif item.startswith("stone"):
+				t /= 4
+			elif item.startswith("iron"):
+				t /= 6
+			elif item.startswith("diamond"):
+				t /= 8
+			elif item.startswith("golden"):
+				t /= 12
+			else:
+				print("error: "+item+" does not exist")
+		else:
+			t *= 10/3
+	elif blockProperties["material"] == "stone":
+		if item.endswith(blockProperties["tool"]):
+			if item.startswith("stone"):
+				t /= 4
+			elif item.startswith("iron"):
+				t /= 6
+			elif item.startswith("diamond"):
+				t /= 8
+			elif item.startswith("golden"):
+				t /= 12
+			else:
+				t *= 10/3
+		else:
+			t *= 10/3
+	elif blockProperties["material"] == "iron":
+		if item.endswith(blockProperties["tool"]):
+			if item.startswith("iron"):
+				t /= 6
+			elif item.startswith("diamond"):
+				t /= 8
+			else:
+				t *= 10/3
+		else:
+			t *= 10/3
+	elif blockProperties["material"] == "diamond":
+		if item.endswith(blockProperties["tool"]):
+			if item.startswith("diamond"):
+				t /= 8
+			else:
+				t *= 10/3
+		else:
+			t *= 10/3
+	else:
+		print("error: "+item+" does not exist")
+
+	return t
 
 #constants
 WIDTH = 1200
 HEIGHT = 675
 
 SCALE = 4 #scale of textures
+GUI_SCALE = 2 #scale of gui
 
 #world generation settings
 WORLD_WIDTH = 256
@@ -37,12 +115,27 @@ pygame.display.set_caption("Minecraft 2d")
 clock = pygame.time.Clock()
 
 #initialing textures
-textures = {"blocks":{}, "entities":{}}
-for blockName in os.listdir("data/textures/blocks/"):
-	textures["blocks"].update({blockName[:-4]:pygame.transform.scale(pygame.image.load("data/textures/blocks/"+blockName), (16*SCALE, 16*SCALE))})
-for entityName in os.listdir("data/textures/entities/"):
-	imageRaw = pygame.image.load("data/textures/entities/"+entityName)
-	textures["entities"].update({entityName[:-4]:pygame.transform.scale(imageRaw, (imageRaw.get_width()*SCALE, imageRaw.get_height()*SCALE))})
+textures = {"blocks":{}, "entities":{}, "items":{}, "gui":{}, "destroy_stages":{}}
+for name in os.listdir("data/textures/blocks/"):
+	textures["blocks"].update({name[:-4]:pygame.transform.scale(pygame.image.load("data/textures/blocks/"+name), (16*SCALE, 16*SCALE))})
+	textures["items"].update({name[:-4]:pygame.transform.scale(pygame.image.load("data/textures/blocks/"+name), (16*GUI_SCALE, 16*GUI_SCALE))})
+for name in os.listdir("data/textures/entities/"):
+	imageRaw = pygame.image.load("data/textures/entities/"+name)
+	textures["entities"].update({name[:-4]:pygame.transform.scale(imageRaw, (imageRaw.get_width()*SCALE, imageRaw.get_height()*SCALE))})
+for name in os.listdir("data/textures/items/"):
+	textures["items"].update({name[:-4]:pygame.transform.scale(pygame.image.load("data/textures/items/"+name), (16*GUI_SCALE, 16*GUI_SCALE))})
+for name in os.listdir("data/textures/gui/"):
+	imageRaw = pygame.image.load("data/textures/gui/"+name)
+	textures["gui"].update({name[:-4]:pygame.transform.scale(imageRaw, (imageRaw.get_width()*GUI_SCALE, imageRaw.get_height()*GUI_SCALE))})
+for name in os.listdir("data/textures/destroy_stages/"):
+	textures["destroy_stages"].update({name[:-4]:pygame.transform.scale(pygame.image.load("data/textures/destroy_stages/"+name), (16*SCALE, 16*SCALE))})
+
+#initializing properties
+properties = {"blocks":{}}
+for blockName in os.listdir("data/properties/blocks/"):
+	propertiesFile = open("data/properties/blocks/"+blockName, "r")
+	properties["blocks"].update({blockName[:-5]:json.loads(propertiesFile.read())})
+	propertiesFile.close()
 
 #generating map
 gameMap = []
@@ -101,13 +194,13 @@ for y in range(WORLD_HEIGHT):
 			except:
 				pass
 
-#steve
+#entities
 entities = []
-entities.append(Entity(0.5, 70, "steveRight"))
+entities.append(Entity(0.5, 70, "steveRight")) #steve
 
 #camera
 camX = 0
-camY = 70
+camY = 0
 
 #keys pressed
 k_a = False
@@ -118,6 +211,15 @@ curX, curY = 0, 0 #cursor
 mouseX, mouseY = 0, 0 #mouse
 
 showDebug = False #F3 menu
+
+#inventory
+inventory = {}
+for i in range(45):
+	inventory[i] = Item("hand")
+inventoryHotbarSelected = 0
+
+breakStart = 0
+breakTime = 0
 
 #main cycle
 alive = True
@@ -154,12 +256,24 @@ while alive:
 		elif event.type == pygame.MOUSEMOTION:
 			mouseX, mouseY = event.pos
 
+			if event.buttons[0]:
+				if int((mouseX+camX*(16*SCALE))//(16*SCALE)) == curX and int((-mouseY+camY*(16*SCALE))//(16*SCALE)+1) == curY:
+					pass
+				else:
+					gameMap[int(curY)][int(curX)].breakStage = -1
+					if gameMap[int((-mouseY+camY*(16*SCALE))//(16*SCALE)+1)][int((mouseX+camX*(16*SCALE))//(16*SCALE))].name != "air":		
+						breakStart = time.time()
+						breakTime = CalculateBreakTime(gameMap[int((-mouseY+camY*(16*SCALE))//(16*SCALE)+1)][int((mouseX+camX*(16*SCALE))//(16*SCALE))].name, inventory[inventoryHotbarSelected].name)
+						gameMap[int((-mouseY+camY*(16*SCALE))//(16*SCALE)+1)][int((mouseX+camX*(16*SCALE))//(16*SCALE))].breakStage += 0.001
+
 		elif event.type == pygame.MOUSEBUTTONDOWN:
 			if event.button == 1:
-				try:
-					gameMap[int(curY)][int(curX)] = Block("air")
-				except:
-					pass
+				if gameMap[int(curY)][int(curX)].name != "air":
+					if gameMap[int(curY)][int(curX)].breakStage == -1:
+						breakStart = time.time()
+						gameMap[int(curY)][int(curX)].breakStage += 0.001
+
+					breakTime = CalculateBreakTime(gameMap[int(curY)][int(curX)].name, inventory[inventoryHotbarSelected].name)
 
 			elif event.button == 3:
 				try:
@@ -173,6 +287,24 @@ while alive:
 				except:
 					pass
 
+			elif event.button == 4:
+				inventoryHotbarSelected-=1
+			elif event.button == 5:
+				inventoryHotbarSelected+=1
+
+		elif event.type == pygame.MOUSEBUTTONUP:
+			if event.button == 1:
+				gameMap[int(curY)][int(curX)].breakStage = -1
+
+	if inventoryHotbarSelected < 0: inventoryHotbarSelected=8
+	if inventoryHotbarSelected > 8: inventoryHotbarSelected=0
+
+	if gameMap[int(curY)][int(curX)].breakStage != -1:
+		gameMap[int(curY)][int(curX)].breakStage = (time.time()-breakStart)/breakTime*10
+	if gameMap[int(curY)][int(curX)].breakStage >= 9:
+		gameMap[int(curY)][int(curX)].breakStage = -1
+		gameMap[int(curY)][int(curX)].name = "air"
+
 	entities[0].velocityX = 0
 
 	if k_a:
@@ -185,6 +317,7 @@ while alive:
 
 	#collision detection
 	for entity in entities:
+		#Y
 		entity.accelerationY = -G
 		entity.velocityY += entity.accelerationY*clock.get_time()/1000
 		entity.y += entity.velocityY*clock.get_time()/1000
@@ -197,12 +330,13 @@ while alive:
 			entity.velocityY = 0
 			entity.y = math.floor(entity.y)
 		
+		#X
 		entity.velocityX += entity.accelerationX*clock.get_time()/1000
 		entity.x += entity.velocityX*clock.get_time()/1000
 
-		if gameMap[math.ceil(entity.y)][math.ceil(entity.x-8/16)].name != "air" or gameMap[math.floor(entity.y)][math.ceil(entity.x-8/16)].name != "air" or gameMap[math.floor(entity.y)-1][math.ceil(entity.x-8/16)].name != "air": #right
+		if gameMap[math.ceil(entity.y)][math.ceil(entity.x-8/16)].name != "air" or gameMap[math.floor(entity.y)][math.ceil(entity.x-8/16)].name != "air" or gameMap[math.floor(entity.y-15/16)][math.ceil(entity.x-8/16)].name != "air": #right
 			entity.x = math.floor(entity.x)+8/16
-		if gameMap[math.ceil(entity.y)][math.floor(entity.x)].name != "air" or gameMap[math.floor(entity.y)][math.floor(entity.x)].name != "air" or gameMap[math.floor(entity.y)-1][math.floor(entity.x)].name != "air": #right
+		if gameMap[math.ceil(entity.y)][math.floor(entity.x)].name != "air" or gameMap[math.floor(entity.y)][math.floor(entity.x)].name != "air" or gameMap[math.floor(entity.y-15/16)][math.floor(entity.x)].name != "air": #left
 			entity.x = math.ceil(entity.x)
 
 		if entity.x < 0: entity.x = 0
@@ -222,6 +356,10 @@ while alive:
 		for x in range(int(camX), 2+int(camX)+WIDTH//(16*SCALE)):
 			if x>=0 and x<WORLD_WIDTH and y>=0 and y<WORLD_HEIGHT and gameMap[y][x].name != "air":
 				screen.blit(textures["blocks"][gameMap[y][x].name], ((x-camX)*16*SCALE, (camY-y)*16*SCALE))
+				
+	#breaking
+	if math.floor(gameMap[int(curY)][int(curX)].breakStage) > -1:
+		screen.blit(textures["destroy_stages"][str(math.floor(gameMap[int(curY)][int(curX)].breakStage))], ((int(curX)-camX)*16*SCALE, (camY-int(curY))*16*SCALE))
 
 	#entities
 	for entity in entities:
@@ -231,11 +369,14 @@ while alive:
 	#cursor
 	pygame.draw.rect(screen, (191, 191, 191), ((curX-camX)*(16*SCALE), (camY-curY)*(16*SCALE), 16*SCALE, 16*SCALE), 1)
 
+	#gui
+	screen.blit(textures["gui"]["hotbar"], (WIDTH//2-91*GUI_SCALE, HEIGHT-22*GUI_SCALE))
+	screen.blit(textures["gui"]["hotbar_selected"], (WIDTH//2-92*GUI_SCALE+inventoryHotbarSelected*20*GUI_SCALE, HEIGHT-23*GUI_SCALE))
+
 	#debug (F3 menu)
 	if showDebug:
 		screen.blit(pygame.font.SysFont("consolas", 11).render("FPS: "+str(clock.get_fps()), 1, (255, 255, 255)), (0, 0))
 		screen.blit(pygame.font.SysFont("consolas", 11).render("XY: "+str(round(entities[0].x, 5))+" / "+str(round(entities[0].y, 5)), 1, (255, 255, 255)), (0, 10))
-		screen.blit(pygame.font.SysFont("consolas", 11).render("Cam XY: "+str(round(camX, 5))+" / "+str(round(camY, 5)), 1, (255, 255, 255)), (0, 20))
 
 	'''
 	pygame.draw.rect(screen, (255, 0, 0), ((math.floor(entities[0].x)-camX)*(16*SCALE), (camY-math.ceil(entities[0].y))*(16*SCALE), 16*SCALE, 16*SCALE), 1)

@@ -1,0 +1,8 @@
+{
+	"hardness": 0.2,
+	"tool": "hoe",
+	"material": "hand",
+	"drop":[
+		{"name": "oak_sapling", "amount": 1, "chance": 0.05},
+		{"name": "apple", "amount": 1, "chance": 0.005}]
+}

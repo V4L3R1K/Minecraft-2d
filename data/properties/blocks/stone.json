@@ -1,0 +1,7 @@
+{
+	"hardness": 1.5,
+	"tool": "pickaxe",
+	"material": "wooden",
+	"drop": [
+		{"name": "cobblestone", "amount": 1, "chance": 1}]
+}
