@@ -8,6 +8,7 @@ import time
 from block import Block
 from entity import Entity
 from item import Item
+from inventorySlot import InventorySlot
 
 def CalculateBreakTime(block, item):
 	blockProperties = properties["blocks"][block]
@@ -83,12 +84,35 @@ def CalculateBreakTime(block, item):
 
 	return t
 
+def Give(inventorySlot):
+	for slot in range(36):
+		if inventory[slot].item.name == inventorySlot.item.name:
+			if inventory[slot].amount+inventorySlot.amount <= properties["items"][inventorySlot.item.name]["stack"]:
+				inventory[slot].amount += inventorySlot.amount
+				return
+			else:
+				inventory[slot].amount = properties["items"][inventorySlot.item.name]["stack"]
+				Give(InventorySlot(inventorySlot.item, properties["items"][inventorySlot.item.name]["stack"]-inventory[slot].amount-inventorySlot.amount))
+				return
+	for slot in range(36):
+		if inventory[slot].item.name == "hand":
+			if inventorySlot.amount <= properties["items"][inventorySlot.item.name]["stack"]:
+				inventory[slot] = inventorySlot
+			else:
+				inventory[slot] = InventorySlot(inventorySlot.item, properties["items"][inventorySlot.item.name]["stack"])
+				Give(InventorySlot(inventorySlot.item, properties["items"][inventorySlot.item.name]["stack"]-inventorySlot.amount))
+			return
+	Drop(inventorySlot)
+
+def Drop(inventorySlot):
+	print("Dropped "+str(inventorySlot.amount)+" "+inventorySlot.item.name)
+
 #constants
-WIDTH = 1200
-HEIGHT = 675
+WIDTH = 1600
+HEIGHT = 900
 
 SCALE = 4 #scale of textures
-GUI_SCALE = 2 #scale of gui
+GUI_SCALE = 4 #scale of gui
 
 #world generation settings
 WORLD_WIDTH = 256
@@ -131,11 +155,15 @@ for name in os.listdir("data/textures/destroy_stages/"):
 	textures["destroy_stages"].update({name[:-4]:pygame.transform.scale(pygame.image.load("data/textures/destroy_stages/"+name), (16*SCALE, 16*SCALE))})
 
 #initializing properties
-properties = {"blocks":{}}
-for blockName in os.listdir("data/properties/blocks/"):
-	propertiesFile = open("data/properties/blocks/"+blockName, "r")
-	properties["blocks"].update({blockName[:-5]:json.loads(propertiesFile.read())})
-	propertiesFile.close()
+properties = {"blocks":{}, "items":{}}
+for name in os.listdir("data/properties/blocks/"):
+	file = open("data/properties/blocks/"+name, "r")
+	properties["blocks"].update({name[:-5]:json.loads(file.read())})
+	file.close()
+for name in os.listdir("data/properties/items/"):
+	file = open("data/properties/items/"+name, "r")
+	properties["items"].update({name[:-5]:json.loads(file.read())})
+	file.close()
 
 #generating map
 gameMap = []
@@ -215,8 +243,9 @@ showDebug = False #F3 menu
 #inventory
 inventory = {}
 for i in range(45):
-	inventory[i] = Item("hand")
+	inventory[i] = InventorySlot(Item("hand"), 1)
 inventoryHotbarSelected = 0
+inventoryOpened = False
 
 breakStart = 0
 breakTime = 0
@@ -246,6 +275,9 @@ while alive:
 			elif event.key == pygame.K_F3:
 				showDebug = not showDebug
 
+			elif event.key == pygame.K_e:
+				inventoryOpened = not inventoryOpened
+
 		elif event.type == pygame.KEYUP:
 			if event.key == pygame.K_a:
 				k_a = False
@@ -263,7 +295,7 @@ while alive:
 					gameMap[int(curY)][int(curX)].breakStage = -1
 					if gameMap[int((-mouseY+camY*(16*SCALE))//(16*SCALE)+1)][int((mouseX+camX*(16*SCALE))//(16*SCALE))].name != "air":		
 						breakStart = time.time()
-						breakTime = CalculateBreakTime(gameMap[int((-mouseY+camY*(16*SCALE))//(16*SCALE)+1)][int((mouseX+camX*(16*SCALE))//(16*SCALE))].name, inventory[inventoryHotbarSelected].name)
+						breakTime = CalculateBreakTime(gameMap[int((-mouseY+camY*(16*SCALE))//(16*SCALE)+1)][int((mouseX+camX*(16*SCALE))//(16*SCALE))].name, inventory[inventoryHotbarSelected].item.name)
 						gameMap[int((-mouseY+camY*(16*SCALE))//(16*SCALE)+1)][int((mouseX+camX*(16*SCALE))//(16*SCALE))].breakStage += 0.001
 
 		elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -273,7 +305,7 @@ while alive:
 						breakStart = time.time()
 						gameMap[int(curY)][int(curX)].breakStage += 0.001
 
-					breakTime = CalculateBreakTime(gameMap[int(curY)][int(curX)].name, inventory[inventoryHotbarSelected].name)
+					breakTime = CalculateBreakTime(gameMap[int(curY)][int(curX)].name, inventory[inventoryHotbarSelected].item.name)
 
 			elif event.button == 3:
 				try:
@@ -283,7 +315,11 @@ while alive:
 						if curY>=0 and curY<WORLD_HEIGHT and curX>=0 and curX<WORLD_WIDTH:
 							#you can place blocks only in the air
 							if gameMap[int(curY)][int(curX)].name == "air":
-								gameMap[int(curY)][int(curX)] = Block("stone")
+								if properties["items"][inventory[inventoryHotbarSelected].item.name]["type"] == "block":
+									gameMap[int(curY)][int(curX)] = Block(inventory[inventoryHotbarSelected].item.name)
+									inventory[inventoryHotbarSelected].amount-=1
+									if inventory[inventoryHotbarSelected].amount == 0:
+										inventory[inventoryHotbarSelected] = InventorySlot(Item("hand"), 1)
 				except:
 					pass
 
@@ -303,6 +339,13 @@ while alive:
 		gameMap[int(curY)][int(curX)].breakStage = (time.time()-breakStart)/breakTime*10
 	if gameMap[int(curY)][int(curX)].breakStage >= 9:
 		gameMap[int(curY)][int(curX)].breakStage = -1
+		number = random.random()
+		summa = 0
+		for drop in properties["blocks"][gameMap[int(curY)][int(curX)].name]["drop"]:
+			summa += drop["chance"]
+			if number < summa:
+				Give(InventorySlot(Item(drop["name"]), drop["amount"]))
+				break
 		gameMap[int(curY)][int(curX)].name = "air"
 
 	entities[0].velocityX = 0
@@ -369,9 +412,17 @@ while alive:
 	#cursor
 	pygame.draw.rect(screen, (191, 191, 191), ((curX-camX)*(16*SCALE), (camY-curY)*(16*SCALE), 16*SCALE, 16*SCALE), 1)
 
-	#gui
+	#hotbar
 	screen.blit(textures["gui"]["hotbar"], (WIDTH//2-91*GUI_SCALE, HEIGHT-22*GUI_SCALE))
 	screen.blit(textures["gui"]["hotbar_selected"], (WIDTH//2-92*GUI_SCALE+inventoryHotbarSelected*20*GUI_SCALE, HEIGHT-23*GUI_SCALE))
+	for slot in range(9):
+		if inventory[slot].item.name != "hand":
+			screen.blit(textures["items"][inventory[slot].item.name], (WIDTH//2-91*GUI_SCALE+3*GUI_SCALE+slot*20*GUI_SCALE, HEIGHT-19*GUI_SCALE))
+			screen.blit(pygame.font.SysFont("consolas", 11).render(str(inventory[slot].amount), 1, (255, 255, 255)), (WIDTH//2-91*GUI_SCALE+3*GUI_SCALE+slot*20*GUI_SCALE, HEIGHT-19*GUI_SCALE))
+
+	#inventory
+	if inventoryOpened:
+		screen.blit(textures["gui"]["inventory"], (WIDTH//2-88*GUI_SCALE, HEIGHT//2-83*GUI_SCALE))
 
 	#debug (F3 menu)
 	if showDebug:
